@@ -10,9 +10,13 @@ import time
 import threading
 import logging
 import random
-from typing import Optional, List
+import yaml
+from datetime import datetime
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 
+import pytz
+import requests
 from flask import Flask, request, jsonify
 from PIL import Image, ImageDraw, ImageFont
 import imageio
@@ -31,27 +35,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger('RPI2DMDv2')
 
-# Configuration de la matrice LED
-MATRIX_CONFIG = {
-    'rows': 64,
-    'cols': 128,
-    'chain_length': 5,
-    'parallel': 1,
-    'hardware_mapping': 'regular',
-    'brightness': 50,
-    'gpio_slowdown': 4,  # Raspberry Pi 4
-}
+# Chemins de base
+BASE_DIR = Path(__file__).parent
+CONFIG_FILE = BASE_DIR / 'config.yaml'
+
+
+def load_config() -> Dict[str, Any]:
+    """Charge la configuration depuis le fichier config.yaml"""
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        logger.info("Configuration chargée depuis config.yaml")
+        return config
+    except FileNotFoundError:
+        logger.error(f"Fichier de configuration non trouvé: {CONFIG_FILE}")
+        sys.exit(1)
+    except yaml.YAMLError as e:
+        logger.error(f"Erreur lors de la lecture de la configuration: {e}")
+        sys.exit(1)
+
+
+# Charger la configuration
+CONFIG = load_config()
+
+# Configuration de la matrice LED (depuis config)
+MATRIX_CONFIG = CONFIG['matrix']
 
 # Dimensions totales de l'affichage
-DISPLAY_WIDTH = MATRIX_CONFIG['cols'] * MATRIX_CONFIG['chain_length']  # 640
-DISPLAY_HEIGHT = MATRIX_CONFIG['rows']  # 64
+DISPLAY_WIDTH = MATRIX_CONFIG['cols'] * MATRIX_CONFIG['chain_length']
+DISPLAY_HEIGHT = MATRIX_CONFIG['rows']
 
-# Chemins des assets
-BASE_DIR = Path(__file__).parent
-ASSETS_DIR = BASE_DIR / 'assets'
-IMAGES_DIR = ASSETS_DIR / 'images'
-VIDEOS_DIR = ASSETS_DIR / 'videos'
-FONTS_DIR = ASSETS_DIR / 'fonts'
+# Chemins des assets (depuis config)
+IMAGES_DIR = BASE_DIR / CONFIG['paths']['images']
+VIDEOS_DIR = BASE_DIR / CONFIG['paths']['videos']
+FONTS_DIR = BASE_DIR / CONFIG['paths']['fonts']
 
 
 class DisplayRenderer:
@@ -357,6 +374,245 @@ class DisplayRenderer:
         except Exception as e:
             logger.error(f"Erreur dans le mode aléatoire: {e}")
 
+    def render_clock(self, format_24h: bool = True, show_seconds: bool = True, color: tuple = (255, 255, 255)):
+        """Affiche l'heure en temps réel"""
+        try:
+            # Récupérer la timezone depuis la config
+            tz = pytz.timezone(CONFIG['location']['timezone'])
+
+            # Charger la police
+            font_path = CONFIG['fonts']['clock']
+            font_size = CONFIG['fonts']['clock_size']
+            try:
+                font = ImageFont.truetype(font_path, font_size)
+            except:
+                font = ImageFont.load_default()
+                logger.warning("Police horloge non trouvée, utilisation de la police par défaut")
+
+            logger.info(f"Démarrage de l'horloge (timezone: {CONFIG['location']['timezone']})")
+
+            while not self.stop_event.is_set():
+                # Obtenir l'heure actuelle dans la timezone configurée
+                now = datetime.now(tz)
+
+                # Formater l'heure
+                if format_24h:
+                    if show_seconds:
+                        time_str = now.strftime("%H:%M:%S")
+                    else:
+                        time_str = now.strftime("%H:%M")
+                else:
+                    if show_seconds:
+                        time_str = now.strftime("%I:%M:%S %p")
+                    else:
+                        time_str = now.strftime("%I:%M %p")
+
+                # Créer l'image
+                img = Image.new('RGB', (DISPLAY_WIDTH, DISPLAY_HEIGHT), (0, 0, 0))
+                draw = ImageDraw.Draw(img)
+
+                # Calculer la position centrée
+                text_bbox = draw.textbbox((0, 0), time_str, font=font)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_height = text_bbox[3] - text_bbox[1]
+                x_pos = (DISPLAY_WIDTH - text_width) // 2
+                y_pos = (DISPLAY_HEIGHT - text_height) // 2
+
+                # Dessiner l'heure
+                draw.text((x_pos, y_pos), time_str, font=font, fill=color)
+
+                # Afficher
+                if not self.simulation_mode:
+                    self.matrix.SetImage(img)
+                elif self.stop_event.is_set():
+                    break
+
+                # Attendre 1 seconde (ou 10 secondes si pas de secondes)
+                time.sleep(1 if show_seconds else 10)
+
+            logger.info("Horloge arrêtée")
+
+        except Exception as e:
+            logger.error(f"Erreur lors de l'affichage de l'horloge: {e}")
+
+    def render_date(self, date_format: str = "%d/%m/%Y", color: tuple = (255, 255, 255)):
+        """Affiche la date statique"""
+        try:
+            # Récupérer la timezone depuis la config
+            tz = pytz.timezone(CONFIG['location']['timezone'])
+            now = datetime.now(tz)
+            date_str = now.strftime(date_format)
+
+            # Charger la police
+            font_path = CONFIG['fonts']['date']
+            font_size = CONFIG['fonts']['date_size']
+            try:
+                font = ImageFont.truetype(font_path, font_size)
+            except:
+                font = ImageFont.load_default()
+                logger.warning("Police date non trouvée, utilisation de la police par défaut")
+
+            # Créer l'image
+            img = Image.new('RGB', (DISPLAY_WIDTH, DISPLAY_HEIGHT), (0, 0, 0))
+            draw = ImageDraw.Draw(img)
+
+            # Calculer la position centrée
+            text_bbox = draw.textbbox((0, 0), date_str, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            x_pos = (DISPLAY_WIDTH - text_width) // 2
+            y_pos = (DISPLAY_HEIGHT - text_height) // 2
+
+            # Dessiner la date
+            draw.text((x_pos, y_pos), date_str, font=font, fill=color)
+
+            # Afficher
+            if self.simulation_mode:
+                logger.info(f"[SIMULATION] Affichage date: {date_str}")
+            else:
+                self.matrix.SetImage(img)
+                logger.info(f"Date affichée: {date_str}")
+
+        except Exception as e:
+            logger.error(f"Erreur lors de l'affichage de la date: {e}")
+
+    def render_weather(self, api_key: str):
+        """Affiche les informations météo (nécessite une clé API OpenWeatherMap)"""
+        try:
+            if not api_key:
+                logger.error("Clé API OpenWeatherMap manquante dans config.yaml")
+                return
+
+            # Récupérer les données météo
+            lat = CONFIG['location']['latitude']
+            lon = CONFIG['location']['longitude']
+            url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric&lang=fr"
+
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            # Extraire les informations
+            temp = round(data['main']['temp'])
+            description = data['weather'][0]['description'].capitalize()
+            city = data['name']
+
+            weather_text = f"{city}: {temp}°C - {description}"
+
+            logger.info(f"Météo récupérée: {weather_text}")
+
+            # Afficher avec scrolling text
+            self.render_text_scroll(weather_text, color=(100, 200, 255))
+
+        except requests.RequestException as e:
+            logger.error(f"Erreur lors de la récupération de la météo: {e}")
+        except KeyError as e:
+            logger.error(f"Erreur lors du parsing des données météo: {e}")
+        except Exception as e:
+            logger.error(f"Erreur inattendue lors de l'affichage météo: {e}")
+
+
+class BrightnessController:
+    """Contrôle automatique de la luminosité selon l'horaire"""
+
+    def __init__(self, matrix: Optional[RGBMatrix], config: Dict[str, Any]):
+        self.matrix = matrix
+        self.config = config
+        self.enabled = config['auto_brightness']['enabled']
+        self.schedule = config['auto_brightness']['schedule']
+        self.current_brightness = config['matrix']['brightness']
+        self.stop_event = threading.Event()
+        self.thread: Optional[threading.Thread] = None
+        self.simulation_mode = matrix is None
+
+        if self.enabled and not self.simulation_mode:
+            self.start()
+
+    def start(self):
+        """Démarre le contrôleur de luminosité"""
+        if not self.enabled:
+            logger.info("Contrôle automatique de luminosité désactivé")
+            return
+
+        self.thread = threading.Thread(target=self._brightness_loop, daemon=True)
+        self.thread.start()
+        logger.info("Contrôle automatique de luminosité démarré")
+
+    def stop(self):
+        """Arrête le contrôleur de luminosité"""
+        self.stop_event.set()
+        if self.thread:
+            self.thread.join(timeout=2.0)
+        logger.info("Contrôle automatique de luminosité arrêté")
+
+    def _brightness_loop(self):
+        """Boucle principale de contrôle de la luminosité"""
+        while not self.stop_event.is_set():
+            try:
+                # Obtenir l'heure actuelle
+                tz = pytz.timezone(CONFIG['location']['timezone'])
+                now = datetime.now(tz)
+                current_time = now.strftime("%H:%M")
+
+                # Trouver la luminosité appropriée pour l'heure actuelle
+                target_brightness = self._get_brightness_for_time(current_time)
+
+                # Changer la luminosité si nécessaire
+                if target_brightness != self.current_brightness:
+                    self._set_brightness(target_brightness)
+
+                # Vérifier toutes les minutes
+                time.sleep(60)
+
+            except Exception as e:
+                logger.error(f"Erreur dans la boucle de contrôle de luminosité: {e}")
+                time.sleep(60)
+
+    def _get_brightness_for_time(self, current_time: str) -> int:
+        """Détermine la luminosité appropriée pour une heure donnée"""
+        # Convertir l'heure actuelle en minutes depuis minuit
+        current_minutes = self._time_to_minutes(current_time)
+
+        # Trier les horaires
+        sorted_schedule = sorted(self.schedule, key=lambda x: self._time_to_minutes(x['time']))
+
+        # Trouver la plage horaire correspondante
+        for i, entry in enumerate(sorted_schedule):
+            entry_minutes = self._time_to_minutes(entry['time'])
+
+            if i == len(sorted_schedule) - 1:
+                # Dernier élément, comparé avec le premier
+                next_entry = sorted_schedule[0]
+                next_minutes = self._time_to_minutes(next_entry['time']) + 24 * 60
+
+                if entry_minutes <= current_minutes < next_minutes:
+                    return entry['brightness']
+            else:
+                # Comparer avec l'élément suivant
+                next_entry = sorted_schedule[i + 1]
+                next_minutes = self._time_to_minutes(next_entry['time'])
+
+                if entry_minutes <= current_minutes < next_minutes:
+                    return entry['brightness']
+
+        # Par défaut, retourner la première valeur
+        return sorted_schedule[0]['brightness']
+
+    def _time_to_minutes(self, time_str: str) -> int:
+        """Convertit une heure HH:MM en minutes depuis minuit"""
+        hours, minutes = map(int, time_str.split(':'))
+        return hours * 60 + minutes
+
+    def _set_brightness(self, brightness: int):
+        """Change la luminosité de la matrice"""
+        if self.simulation_mode:
+            logger.info(f"[SIMULATION] Changement de luminosité: {brightness}%")
+        else:
+            self.matrix.brightness = brightness
+            logger.info(f"Luminosité ajustée à {brightness}%")
+
+        self.current_brightness = brightness
+
 
 def initialize_matrix() -> Optional[RGBMatrix]:
     """Initialise la matrice LED avec les paramètres configurés"""
@@ -391,6 +647,7 @@ def initialize_matrix() -> Optional[RGBMatrix]:
 app = Flask(__name__)
 matrix = initialize_matrix()
 renderer = DisplayRenderer(matrix)
+brightness_controller = BrightnessController(matrix, CONFIG)
 
 
 @app.route('/')
@@ -409,7 +666,15 @@ def index():
             '/text': 'GET ?content=Hello+World&color=255,255,255 - Défiler du texte',
             '/video': 'GET ?filename=animation.gif - Lire une vidéo',
             '/random': 'GET ?interval=10 - Afficher aléatoirement images/vidéos avec intervalle',
+            '/clock': 'GET ?format=24&seconds=true&color=255,255,255 - Afficher l\'heure',
+            '/date': 'GET ?format=%d/%m/%Y&color=255,255,255 - Afficher la date',
+            '/weather': 'GET - Afficher la météo (nécessite clé API)',
             '/clear': 'GET - Effacer l\'écran',
+        },
+        'config': {
+            'location': CONFIG['location']['city'],
+            'timezone': CONFIG['location']['timezone'],
+            'auto_brightness': CONFIG['auto_brightness']['enabled']
         }
     })
 
@@ -514,6 +779,96 @@ def display_random():
     })
 
 
+@app.route('/clock')
+def display_clock():
+    """Affiche l'heure en temps réel"""
+    # Paramètres depuis la requête ou config
+    format_str = request.args.get('format', '24')
+    seconds_str = request.args.get('seconds', 'true')
+    color_str = request.args.get('color', None)
+
+    # Format 24h ou 12h
+    format_24h = format_str == '24'
+
+    # Afficher les secondes
+    show_seconds = seconds_str.lower() in ['true', '1', 'yes']
+
+    # Couleur
+    if color_str:
+        try:
+            color = tuple(map(int, color_str.split(',')))
+            if len(color) != 3:
+                raise ValueError
+        except:
+            return jsonify({'error': 'Couleur invalide (format: R,G,B)'}), 400
+    else:
+        color = tuple(CONFIG['clock']['color'])
+
+    renderer.start_render(renderer.render_clock, format_24h, show_seconds, color)
+
+    return jsonify({
+        'status': 'success',
+        'action': 'clock',
+        'format': '24h' if format_24h else '12h',
+        'seconds': show_seconds,
+        'color': color
+    })
+
+
+@app.route('/date')
+def display_date():
+    """Affiche la date"""
+    # Paramètres depuis la requête ou config
+    date_format = request.args.get('format', CONFIG['clock']['date_format'])
+    color_str = request.args.get('color', None)
+
+    # Couleur
+    if color_str:
+        try:
+            color = tuple(map(int, color_str.split(',')))
+            if len(color) != 3:
+                raise ValueError
+        except:
+            return jsonify({'error': 'Couleur invalide (format: R,G,B)'}), 400
+    else:
+        color = tuple(CONFIG['clock']['color'])
+
+    renderer.start_render(renderer.render_date, date_format, color)
+
+    # Obtenir la date pour la réponse
+    tz = pytz.timezone(CONFIG['location']['timezone'])
+    now = datetime.now(tz)
+    date_str = now.strftime(date_format)
+
+    return jsonify({
+        'status': 'success',
+        'action': 'date',
+        'date': date_str,
+        'format': date_format,
+        'color': color
+    })
+
+
+@app.route('/weather')
+def display_weather():
+    """Affiche la météo"""
+    api_key = CONFIG['api_keys'].get('openweathermap', '')
+
+    if not api_key:
+        return jsonify({
+            'error': 'Clé API OpenWeatherMap manquante',
+            'help': 'Configurez la clé API dans config.yaml sous api_keys.openweathermap'
+        }), 400
+
+    renderer.start_render(renderer.render_weather, api_key)
+
+    return jsonify({
+        'status': 'success',
+        'action': 'weather',
+        'location': CONFIG['location']['city']
+    })
+
+
 @app.route('/clear')
 def clear_display():
     """Efface l'écran"""
@@ -533,11 +888,14 @@ if __name__ == '__main__':
 
     logger.info("Démarrage du serveur RPI2DMDv2...")
     logger.info(f"Affichage: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT} pixels")
+    logger.info(f"Localisation: {CONFIG['location']['city']} ({CONFIG['location']['timezone']})")
+    logger.info(f"Luminosité auto: {'Activée' if CONFIG['auto_brightness']['enabled'] else 'Désactivée'}")
 
     # Démarrer le serveur Flask
+    server_config = CONFIG['server']
     app.run(
-        host='0.0.0.0',
-        port=5000,
-        debug=False,
+        host=server_config['host'],
+        port=server_config['port'],
+        debug=server_config['debug'],
         threaded=True
     )

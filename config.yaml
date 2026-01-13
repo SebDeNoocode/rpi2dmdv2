@@ -1,0 +1,83 @@
+# Configuration RPI2DMDv2
+# Fichier de configuration centralisé pour tous les paramètres
+
+# Configuration de la matrice LED
+matrix:
+  rows: 64
+  cols: 128
+  chain_length: 5
+  parallel: 1
+  hardware_mapping: "regular"  # "regular" ou "adafruit-hat"
+  brightness: 50  # 0-100
+  gpio_slowdown: 4  # Raspberry Pi 4 (ajuster selon le modèle)
+
+# Chemins des médias
+paths:
+  images: "assets/images"
+  videos: "assets/videos"
+  fonts: "assets/fonts"
+
+# Durées par défaut (en secondes)
+durations:
+  default_image: 10  # Durée par défaut pour les images
+  default_video: 10  # Durée par défaut pour les vidéos
+  random_interval: 10  # Intervalle pour le mode aléatoire
+
+# Configuration de l'horloge et date
+clock:
+  enabled: true
+  format_24h: true  # true pour 24h, false pour 12h AM/PM
+  show_seconds: true
+  color: [255, 255, 255]  # RGB blanc
+  date_format: "%d/%m/%Y"  # Format: jour/mois/année
+
+# Gestion automatique de la luminosité
+auto_brightness:
+  enabled: true
+  # Horaires et niveaux de luminosité (0-100)
+  schedule:
+    - time: "06:00"
+      brightness: 30
+    - time: "08:00"
+      brightness: 60
+    - time: "12:00"
+      brightness: 80
+    - time: "18:00"
+      brightness: 60
+    - time: "22:00"
+      brightness: 30
+    - time: "00:00"
+      brightness: 15
+
+# Localisation et API
+location:
+  city: "Paris"
+  country: "FR"
+  timezone: "Europe/Paris"
+  latitude: 48.8566
+  longitude: 2.3522
+
+# Clés API (à renseigner pour utiliser les services externes)
+api_keys:
+  openweathermap: ""  # https://openweathermap.org/api
+  # Ajoutez d'autres clés API ici si nécessaire
+
+# Configuration du serveur Flask
+server:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+
+# Extensions de fichiers supportées
+supported_formats:
+  images: [".png", ".jpg", ".jpeg", ".bmp", ".gif"]
+  videos: [".gif", ".mp4", ".avi", ".mov"]
+
+# Polices
+fonts:
+  clock: "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+  clock_size: 32
+  date: "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+  date_size: 16
+  text: "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+  text_size: 16
