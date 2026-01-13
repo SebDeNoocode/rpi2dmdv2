@@ -30,45 +30,349 @@ Le Raspberry Pi devient un objet connecté pilotable à distance, sans interacti
 
 ## 📦 Installation
 
-### 1️⃣ Prérequis système
+### 🔧 Prérequis matériels
 
-Installer les dépendances système nécessaires :
+**Obligatoire :**
+- ✅ **Raspberry Pi 4** (recommandé) ou Raspberry Pi 3B+
+- ✅ **Carte SD** minimum 8 GB (16 GB recommandé)
+- ✅ **Alimentation** 5V 3A minimum pour le Raspberry Pi
+- ✅ **Panneaux LED HUB75** P2.5 ou P3
+  - Dans cet exemple : 5 panneaux 128×64
+  - Résolution totale : 640×64 pixels
+- ✅ **HAT RGB Matrix** pour Raspberry Pi
+  - Modèle Adafruit RGB Matrix HAT ou compatible
+  - [Lien vers le produit](https://www.adafruit.com/product/2345)
+- ✅ **Alimentation 5V** pour les panneaux LED
+  - Puissance à calculer : ~0.06W par LED
+  - Pour 640×64 = 40,960 LEDs × 0.06W = ~2,500W
+  - Prévoir une alimentation 5V 50A minimum
+
+**Optionnel :**
+- 🔌 Câble Ethernet (pour première configuration)
+- 💻 Clavier/souris USB (pour configuration initiale)
+- 🖥️ Écran HDMI (pour première installation)
+
+---
+
+### 💿 Installation du système
+
+#### 1️⃣ Préparer la carte SD
+
+**Option A : Raspberry Pi Imager (recommandé)**
+
+1. Télécharger [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
+2. Choisir **Raspberry Pi OS Lite (64-bit)**
+3. Configurer via les options avancées (Ctrl+Shift+X) :
+   - ✅ Activer SSH
+   - ✅ Configurer WiFi (optionnel)
+   - ✅ Définir nom d'utilisateur/mot de passe
+   - ✅ Définir hostname : `rpi2dmd`
+4. Écrire sur la carte SD
+
+**Option B : Image manuelle**
 
 ```bash
+# Télécharger l'image
+wget https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2024-03-15/2024-03-15-raspios-bookworm-arm64-lite.img.xz
+
+# Écrire sur la carte SD (remplacer /dev/sdX par votre carte)
+sudo dd if=2024-03-15-raspios-bookworm-arm64-lite.img.xz of=/dev/sdX bs=4M status=progress
+```
+
+#### 2️⃣ Premier démarrage
+
+1. Insérer la carte SD dans le Raspberry Pi
+2. Brancher le câble Ethernet (optionnel)
+3. Brancher l'alimentation
+4. Attendre ~30 secondes pour le boot
+
+#### 3️⃣ Connexion SSH
+
+```bash
+# Trouver l'IP du Raspberry Pi
+# Méthode 1 : via votre routeur
+# Méthode 2 : scanner le réseau
+nmap -sn 192.168.1.0/24
+
+# Se connecter en SSH
+ssh pi@192.168.1.XXX
+# Mot de passe par défaut : raspberry (si non changé)
+```
+
+---
+
+### 🔨 Installation des dépendances
+
+#### 1️⃣ Mise à jour du système
+
+```bash
+# Se connecter au Raspberry Pi en SSH
+ssh pi@rpi2dmd.local
+
+# Mettre à jour le système
 sudo apt-get update
-sudo apt-get install -y python3-dev python3-pip git
+sudo apt-get upgrade -y
+
+# Installer les outils de base
+sudo apt-get install -y \
+    git \
+    python3 \
+    python3-pip \
+    python3-dev \
+    python3-pillow \
+    build-essential \
+    libgraphicsmagick++-dev \
+    libwebp-dev \
+    wget
 ```
 
-### 2️⃣ Installer rpi-rgb-led-matrix
+#### 2️⃣ Installer rpi-rgb-led-matrix
 
-Cloner et compiler la librairie Hzeller :
+Cette librairie est le cœur du système d'affichage LED.
 
 ```bash
+# Aller dans le répertoire home
 cd ~
+
+# Cloner la librairie Hzeller
 git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
+
+# Compiler la librairie
 cd rpi-rgb-led-matrix
+make -C lib
+
+# Compiler les exemples (optionnel, pour tester)
 make -C examples-api-use
-```
 
-Installer les bindings Python :
-
-```bash
+# Installer les bindings Python
 cd bindings/python
 sudo pip3 install -e .
 ```
 
-### 3️⃣ Cloner RPI2DMDv2
+**Tester l'installation :**
 
 ```bash
+# Test simple avec un exemple
+cd ~/rpi-rgb-led-matrix/examples-api-use
+sudo ./demo -D0 \
+    --led-rows=64 \
+    --led-cols=128 \
+    --led-chain=5 \
+    --led-brightness=50
+
+# Appuyer sur Ctrl+C pour arrêter
+```
+
+Si vous voyez des pixels s'allumer sur vos panneaux LED, l'installation est réussie ! ✅
+
+#### 3️⃣ Cloner RPI2DMDv2
+
+```bash
+# Retourner dans le répertoire home
 cd ~
+
+# Cloner le projet RPI2DMDv2
 git clone https://github.com/SebDeNoocode/rpi2dmdv2.git
+
+# Aller dans le répertoire
 cd rpi2dmdv2
 ```
 
-### 4️⃣ Installer les dépendances Python
+#### 4️⃣ Installer les dépendances Python
 
 ```bash
+# Installer toutes les dépendances
 sudo pip3 install -r requirements.txt
+
+# Vérifier l'installation
+python3 -c "import flask; import PIL; import yaml; print('✅ Dépendances OK')"
+```
+
+---
+
+### ⚙️ Configuration initiale
+
+#### 1️⃣ Créer le fichier de configuration
+
+```bash
+# Copier le fichier d'exemple
+cp config.example.yaml config.yaml
+
+# Éditer la configuration
+nano config.yaml
+```
+
+#### 2️⃣ Paramètres essentiels à configurer
+
+**Matrice LED** (adapter à votre installation) :
+
+```yaml
+matrix:
+  rows: 64                    # Lignes par panneau
+  cols: 128                   # Colonnes par panneau
+  chain_length: 5             # Nombre de panneaux
+  brightness: 50              # Luminosité initiale
+  led_rgb_sequence: "RGB"     # Ajuster si couleurs inversées
+```
+
+**Localisation** (pour horloge et météo) :
+
+```yaml
+location:
+  city: "Paris"               # Votre ville
+  timezone: "Europe/Paris"    # Votre fuseau horaire
+  latitude: 48.8566           # Coordonnées GPS
+  longitude: 2.3522
+```
+
+**WiFi** (optionnel) :
+
+```yaml
+wifi:
+  enabled: true
+  ssid: "VotreSSID"
+  password: "VotreMotDePasse"
+  country: "FR"
+```
+
+Sauvegarder avec `Ctrl+O` puis quitter avec `Ctrl+X`.
+
+#### 3️⃣ Configurer le WiFi (optionnel)
+
+```bash
+# Si vous voulez configurer le WiFi depuis config.yaml
+sudo python3 wifi_setup.py
+```
+
+---
+
+### 🚀 Premier démarrage
+
+#### Test manuel
+
+```bash
+# Lancer le serveur
+sudo python3 controller.py
+```
+
+Vous devriez voir :
+
+```
+2026-01-13 10:00:00 - RPI2DMDv2 - INFO - Configuration chargée depuis config.yaml
+2026-01-13 10:00:00 - RPI2DMDv2 - INFO - Matrice LED initialisée: 640x64 pixels
+2026-01-13 10:00:00 - RPI2DMDv2 - INFO - Démarrage du serveur RPI2DMDv2...
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+```
+
+#### Tester depuis un autre ordinateur
+
+```bash
+# Trouver l'IP du Raspberry Pi
+hostname -I
+
+# Depuis votre ordinateur, ouvrir un navigateur :
+http://192.168.1.XXX:5000/dashboard
+```
+
+---
+
+### ✅ Tests de validation
+
+#### Test 1 : Dashboard web
+
+1. Ouvrir `http://IP_RASPBERRY:5000/dashboard`
+2. Vérifier que l'interface s'affiche correctement
+3. Tester l'upload d'une image
+
+#### Test 2 : Affichage d'une image
+
+```bash
+# Uploader une image de test via le dashboard
+# OU via curl :
+curl -X POST -F "files=@test.png" http://IP_RASPBERRY:5000/files/upload
+
+# Afficher l'image
+curl "http://IP_RASPBERRY:5000/image?filename=test.png"
+```
+
+#### Test 3 : Horloge
+
+```bash
+curl "http://IP_RASPBERRY:5000/clock"
+```
+
+L'heure devrait s'afficher sur l'écran LED.
+
+#### Test 4 : Texte défilant
+
+```bash
+curl "http://IP_RASPBERRY:5000/text?content=Hello+World"
+```
+
+---
+
+### 🔄 Installation du service systemd (démarrage automatique)
+
+Pour que le serveur démarre automatiquement au boot du Raspberry Pi :
+
+#### 1️⃣ Créer le fichier service
+
+```bash
+sudo nano /etc/systemd/system/rpi2dmdv2.service
+```
+
+#### 2️⃣ Contenu du fichier
+
+```ini
+[Unit]
+Description=RPI2DMDv2 LED Matrix Controller
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/rpi2dmdv2
+ExecStart=/usr/bin/python3 /home/pi/rpi2dmdv2/controller.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### 3️⃣ Activer et démarrer le service
+
+```bash
+# Recharger systemd
+sudo systemctl daemon-reload
+
+# Activer le démarrage automatique
+sudo systemctl enable rpi2dmdv2.service
+
+# Démarrer le service
+sudo systemctl start rpi2dmdv2.service
+
+# Vérifier le statut
+sudo systemctl status rpi2dmdv2.service
+```
+
+#### 4️⃣ Commandes utiles
+
+```bash
+# Voir les logs en temps réel
+sudo journalctl -u rpi2dmdv2.service -f
+
+# Redémarrer le service
+sudo systemctl restart rpi2dmdv2.service
+
+# Arrêter le service
+sudo systemctl stop rpi2dmdv2.service
+
+# Désactiver le démarrage automatique
+sudo systemctl disable rpi2dmdv2.service
 ```
 
 ---
@@ -748,20 +1052,296 @@ Créez des boutons avec des actions "Open URL" pointant vers vos endpoints.
 
 ## 🐛 Dépannage
 
-### Le serveur ne démarre pas
+### Problème : "Permission denied" lors du démarrage
 
-- Vérifiez que vous exécutez avec `sudo`
-- Vérifiez que la librairie `rgbmatrix` est installée : `python3 -c "import rgbmatrix"`
+**Symptôme :** Le serveur refuse de démarrer avec une erreur de permission.
 
-### L'affichage scintille
+**Solution :**
+```bash
+# Le script doit être exécuté en root
+sudo python3 controller.py
+```
 
-- Augmentez `gpio_slowdown` dans la configuration (essayez 4 ou 5)
-- Vérifiez l'alimentation des panneaux
+**Cause :** Les panneaux LED nécessitent un accès direct au GPIO.
 
-### Pas d'image affichée
+---
 
-- Vérifiez que les fichiers sont dans `assets/images/` ou `assets/videos/`
-- Consultez les logs du serveur pour voir les erreurs
+### Problème : "ModuleNotFoundError: No module named 'rgbmatrix'"
+
+**Symptôme :** Python ne trouve pas la librairie rgbmatrix.
+
+**Solution :**
+```bash
+# Réinstaller les bindings Python
+cd ~/rpi-rgb-led-matrix/bindings/python
+sudo pip3 install -e .
+
+# Vérifier l'installation
+python3 -c "import rgbmatrix; print('✅ OK')"
+```
+
+---
+
+### Problème : Couleurs inversées (rouge → bleu, etc.)
+
+**Symptôme :** Les couleurs affichées ne correspondent pas.
+
+**Solution :** Changer `led_rgb_sequence` dans config.yaml :
+
+```yaml
+matrix:
+  led_rgb_sequence: "BGR"  # Essayer : BGR, GRB, RBG, BRG, GBR
+```
+
+**Test rapide :**
+1. Créer une image avec 3 carrés : rouge, vert, bleu
+2. L'afficher
+3. Ajuster la séquence jusqu'à ce que les couleurs soient correctes
+
+---
+
+### Problème : Panneaux scintillent ou affichage instable
+
+**Symptôme :** Les LEDs clignotent ou l'image est instable.
+
+**Solutions :**
+
+1. **Augmenter gpio_slowdown** :
+```yaml
+matrix:
+  gpio_slowdown: 5  # Essayer 4, 5 ou 6
+```
+
+2. **Vérifier l'alimentation** :
+- Alimentation suffisante (5V, calculer selon nombre de LEDs)
+- Câbles d'alimentation de bonne qualité
+- Connexions bien serrées
+
+3. **Désactiver l'audio Raspberry Pi** :
+```bash
+# Éditer /boot/config.txt
+sudo nano /boot/config.txt
+
+# Ajouter ou décommenter :
+dtparam=audio=off
+
+# Redémarrer
+sudo reboot
+```
+
+---
+
+### Problème : Fichier de configuration non trouvé
+
+**Symptôme :** Erreur "Configuration file not found".
+
+**Solution :**
+```bash
+# Créer config.yaml depuis l'exemple
+cp config.example.yaml config.yaml
+
+# Éditer selon vos besoins
+nano config.yaml
+```
+
+---
+
+### Problème : Dashboard inaccessible
+
+**Symptôme :** Le dashboard ne s'affiche pas dans le navigateur.
+
+**Solutions :**
+
+1. **Vérifier que le serveur est démarré** :
+```bash
+sudo systemctl status rpi2dmdv2.service
+# OU
+ps aux | grep controller.py
+```
+
+2. **Vérifier l'IP du Raspberry Pi** :
+```bash
+hostname -I
+```
+
+3. **Tester l'accès local** :
+```bash
+curl http://localhost:5000/
+```
+
+4. **Vérifier le pare-feu** :
+```bash
+sudo ufw status
+# Si actif, autoriser le port 5000
+sudo ufw allow 5000
+```
+
+---
+
+### Problème : Upload de fichiers échoue
+
+**Symptôme :** Les fichiers ne s'uploadent pas via le dashboard.
+
+**Solutions :**
+
+1. **Vérifier les permissions des dossiers** :
+```bash
+sudo chmod -R 755 assets/images assets/videos
+sudo chown -R pi:pi assets/
+```
+
+2. **Vérifier l'espace disque** :
+```bash
+df -h
+```
+
+3. **Vérifier les logs** :
+```bash
+sudo journalctl -u rpi2dmdv2.service -n 50
+```
+
+---
+
+### Problème : Météo ne s'affiche pas
+
+**Symptôme :** Erreur lors de l'appel à `/weather`.
+
+**Solutions :**
+
+1. **Vérifier la clé API** dans config.yaml :
+```yaml
+api_keys:
+  openweathermap: "VOTRE_CLE_ICI"  # Pas vide !
+```
+
+2. **Obtenir une clé API gratuite** :
+   - Aller sur https://openweathermap.org/api
+   - Créer un compte
+   - Générer une clé API
+   - Attendre 10-15 minutes pour l'activation
+
+3. **Tester la clé API** :
+```bash
+curl "http://api.openweathermap.org/data/2.5/weather?lat=48.8566&lon=2.3522&appid=VOTRE_CLE&units=metric"
+```
+
+---
+
+### Problème : Le service ne démarre pas au boot
+
+**Symptôme :** Le serveur ne démarre pas automatiquement.
+
+**Solutions :**
+
+1. **Vérifier que le service est activé** :
+```bash
+sudo systemctl is-enabled rpi2dmdv2.service
+```
+
+2. **Activer le service** :
+```bash
+sudo systemctl enable rpi2dmdv2.service
+```
+
+3. **Vérifier les logs** :
+```bash
+sudo journalctl -u rpi2dmdv2.service -b
+```
+
+4. **Vérifier le chemin dans le service** :
+```bash
+sudo nano /etc/systemd/system/rpi2dmdv2.service
+# Vérifier WorkingDirectory et ExecStart
+```
+
+---
+
+### Problème : Panneaux ne s'allument pas du tout
+
+**Symptôme :** Aucun affichage sur les panneaux LED.
+
+**Solutions :**
+
+1. **Tester avec l'exemple de base** :
+```bash
+cd ~/rpi-rgb-led-matrix/examples-api-use
+sudo ./demo -D0 --led-rows=64 --led-cols=128 --led-chain=5
+```
+
+2. **Vérifier les connexions matérielles** :
+   - HAT bien enfoncé sur les GPIO
+   - Câbles des panneaux bien connectés
+   - Alimentation 5V branchée et fonctionnelle
+
+3. **Vérifier la configuration matérielle** dans config.yaml :
+```yaml
+matrix:
+  rows: 64          # Doit correspondre à vos panneaux
+  cols: 128         # Doit correspondre à vos panneaux
+  chain_length: 5   # Nombre de panneaux
+  hardware_mapping: "regular"  # Essayer "adafruit-hat"
+```
+
+---
+
+### Problème : Horloge affiche un fuseau horaire incorrect
+
+**Symptôme :** L'heure affichée n'est pas la bonne.
+
+**Solution :** Configurer le timezone dans config.yaml :
+
+```yaml
+location:
+  timezone: "Europe/Paris"  # Votre fuseau horaire
+```
+
+**Liste des timezones** :
+```bash
+timedatectl list-timezones | grep Europe
+```
+
+---
+
+### Problème : Logs trop verbeux
+
+**Symptôme :** Trop de logs dans journalctl.
+
+**Solution :** Modifier le niveau de log dans controller.py :
+
+```python
+logging.basicConfig(
+    level=logging.WARNING,  # Changer INFO en WARNING
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+```
+
+---
+
+### 🆘 Besoin d'aide supplémentaire ?
+
+1. **Consulter les logs** :
+```bash
+sudo journalctl -u rpi2dmdv2.service -f
+```
+
+2. **Mode debug** :
+```bash
+# Arrêter le service
+sudo systemctl stop rpi2dmdv2.service
+
+# Lancer manuellement avec logs
+sudo python3 controller.py
+```
+
+3. **Ouvrir une issue GitHub** :
+   - [https://github.com/SebDeNoocode/rpi2dmdv2/issues](https://github.com/SebDeNoocode/rpi2dmdv2/issues)
+   - Inclure les logs, configuration, et description du problème
+
+4. **Réinstaller complètement** :
+```bash
+cd ~/rpi2dmdv2
+sudo ./install.sh
+```
 
 ---
 
