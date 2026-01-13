@@ -172,6 +172,43 @@ curl "http://192.168.1.100:5000/video?filename=demo.gif"
 
 ---
 
+### 🎲 Mode aléatoire (diaporama)
+
+```bash
+GET http://<IP_RASPBERRY>:5000/random?interval=10
+```
+
+**Paramètres :**
+- `interval` : durée d'affichage de chaque média en secondes (défaut: 10)
+
+Lance un diaporama automatique qui :
+- Scanne tous les médias dans `assets/images/` et `assets/videos/`
+- Les affiche aléatoirement un par un
+- Chaque média est affiché pendant la durée définie
+- Les vidéos/GIF jouent en boucle pendant l'intervalle
+- Continue indéfiniment jusqu'à l'arrêt (via `/clear`)
+
+**Exemples :**
+
+```bash
+# Diaporama avec intervalle de 10 secondes (défaut)
+curl "http://192.168.1.100:5000/random"
+
+# Diaporama rapide (5 secondes par média)
+curl "http://192.168.1.100:5000/random?interval=5"
+
+# Diaporama lent (30 secondes par média)
+curl "http://192.168.1.100:5000/random?interval=30"
+```
+
+**Cas d'usage :**
+- Affichage publicitaire automatique
+- Écran d'accueil dynamique
+- Galerie photo automatique
+- Rotation de contenu sans intervention
+
+---
+
 ### 🖤 Effacer l'écran
 
 ```bash
@@ -302,6 +339,9 @@ curl "http://192.168.1.100:5000/text?content=Bienvenue"
 # Lire une vidéo
 curl "http://192.168.1.100:5000/video?filename=intro.gif"
 
+# Mode diaporama aléatoire (10 secondes par média)
+curl "http://192.168.1.100:5000/random?interval=10"
+
 # Effacer
 curl "http://192.168.1.100:5000/clear"
 ```
@@ -318,6 +358,9 @@ requests.get(f"{base_url}/image", params={"filename": "logo.png"})
 
 # Texte rouge
 requests.get(f"{base_url}/text", params={"content": "Hello World", "color": "255,0,0"})
+
+# Mode diaporama (15 secondes par média)
+requests.get(f"{base_url}/random", params={"interval": 15})
 
 # Effacer
 requests.get(f"{base_url}/clear")
@@ -364,13 +407,19 @@ Ce projet est open-source. Contributions bienvenues !
 
 ## 🚧 Roadmap
 
-Fonctionnalités futures envisagées :
+Fonctionnalités disponibles :
+- ✅ Mode diaporama aléatoire avec intervalle configurable
+- ✅ Support images (PNG, JPG, BMP)
+- ✅ Support vidéos/GIF avec lecture en boucle
+- ✅ Texte défilant avec couleur personnalisable
 
+Fonctionnalités futures envisagées :
 - 🧪 Dashboard web pour contrôle visuel
-- 🧱 Support des playlists / scènes
+- 🧱 Playlists ordonnées et scènes personnalisées
 - 🧵 Gestion avancée des animations
-- 🎨 Effets visuels (fade, transition)
+- 🎨 Effets visuels (fade, transition, wipe)
 - 📊 Affichage de données en temps réel (météo, crypto, etc.)
+- 🕐 Programmation horaire (scheduler)
 
 ---
 

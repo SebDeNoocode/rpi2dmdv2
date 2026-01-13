@@ -9,7 +9,8 @@ import sys
 import time
 import threading
 import logging
-from typing import Optional
+import random
+from typing import Optional, List
 from pathlib import Path
 
 from flask import Flask, request, jsonify
@@ -222,6 +223,140 @@ class DisplayRenderer:
         except Exception as e:
             logger.error(f"Erreur lors de la lecture vidéo: {e}")
 
+    def render_image_timed(self, image_path: Path, duration: float):
+        """Affiche une image pendant une durée définie"""
+        try:
+            img = Image.open(image_path)
+
+            # Redimensionner l'image si nécessaire
+            if img.size != (DISPLAY_WIDTH, DISPLAY_HEIGHT):
+                img = img.resize((DISPLAY_WIDTH, DISPLAY_HEIGHT), Image.LANCZOS)
+
+            # Convertir en RGB si nécessaire
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            if self.simulation_mode:
+                logger.info(f"[SIMULATION] Affichage image: {image_path.name} pendant {duration}s")
+            else:
+                self.matrix.SetImage(img)
+                logger.info(f"Image affichée: {image_path.name} pendant {duration}s")
+
+            # Attendre la durée spécifiée
+            start_time = time.time()
+            while not self.stop_event.is_set() and (time.time() - start_time) < duration:
+                time.sleep(0.1)
+
+        except Exception as e:
+            logger.error(f"Erreur lors du rendu de l'image: {e}")
+
+    def render_video_timed(self, video_path: Path, duration: float):
+        """Lit une vidéo ou un GIF pendant une durée définie"""
+        try:
+            # Lire le fichier avec imageio
+            reader = imageio.get_reader(video_path)
+            fps = reader.get_meta_data().get('fps', 30)
+            frame_delay = 1.0 / fps
+
+            logger.info(f"Lecture vidéo: {video_path.name} pendant {duration}s à {fps} FPS")
+
+            start_time = time.time()
+            while not self.stop_event.is_set() and (time.time() - start_time) < duration:
+                for frame in reader:
+                    if self.stop_event.is_set() or (time.time() - start_time) >= duration:
+                        break
+
+                    # Convertir le frame en Image PIL
+                    img = Image.fromarray(frame)
+
+                    # Redimensionner si nécessaire
+                    if img.size != (DISPLAY_WIDTH, DISPLAY_HEIGHT):
+                        img = img.resize((DISPLAY_WIDTH, DISPLAY_HEIGHT), Image.LANCZOS)
+
+                    # Convertir en RGB
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+
+                    if not self.simulation_mode:
+                        self.matrix.SetImage(img)
+
+                    time.sleep(frame_delay)
+
+                # Recommencer la vidéo si on n'a pas atteint la durée
+                if (time.time() - start_time) < duration:
+                    reader.set_image_index(0)
+
+            reader.close()
+            logger.info(f"Lecture vidéo terminée: {video_path.name}")
+
+        except Exception as e:
+            logger.error(f"Erreur lors de la lecture vidéo: {e}")
+
+    def get_all_media_files(self) -> List[Path]:
+        """Récupère tous les fichiers médias disponibles"""
+        media_files = []
+
+        # Extensions supportées
+        image_extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.gif'}
+        video_extensions = {'.gif', '.mp4', '.avi', '.mov'}
+
+        # Scanner le dossier images
+        if IMAGES_DIR.exists():
+            for file in IMAGES_DIR.iterdir():
+                if file.is_file() and file.suffix.lower() in image_extensions:
+                    media_files.append(('image', file))
+
+        # Scanner le dossier videos
+        if VIDEOS_DIR.exists():
+            for file in VIDEOS_DIR.iterdir():
+                if file.is_file() and file.suffix.lower() in video_extensions:
+                    media_files.append(('video', file))
+
+        return media_files
+
+    def render_random_media(self, interval: float = 10.0, shuffle: bool = True):
+        """
+        Affiche aléatoirement des médias avec un intervalle défini
+
+        Args:
+            interval: durée d'affichage de chaque média en secondes (défaut: 10s)
+            shuffle: si True, mélange aléatoirement l'ordre (défaut: True)
+        """
+        try:
+            logger.info(f"Démarrage du mode aléatoire avec intervalle de {interval}s")
+
+            while not self.stop_event.is_set():
+                # Récupérer tous les médias disponibles
+                media_files = self.get_all_media_files()
+
+                if not media_files:
+                    logger.warning("Aucun média trouvé dans assets/images ou assets/videos")
+                    time.sleep(5)
+                    continue
+
+                logger.info(f"{len(media_files)} médias trouvés")
+
+                # Mélanger l'ordre si demandé
+                if shuffle:
+                    random.shuffle(media_files)
+
+                # Afficher chaque média
+                for media_type, media_path in media_files:
+                    if self.stop_event.is_set():
+                        break
+
+                    logger.info(f"Affichage de {media_type}: {media_path.name}")
+
+                    if media_type == 'image':
+                        self.render_image_timed(media_path, interval)
+                    elif media_type == 'video':
+                        self.render_video_timed(media_path, interval)
+
+            logger.info("Mode aléatoire terminé")
+
+        except Exception as e:
+            logger.error(f"Erreur dans le mode aléatoire: {e}")
+
 
 def initialize_matrix() -> Optional[RGBMatrix]:
     """Initialise la matrice LED avec les paramètres configurés"""
@@ -273,6 +408,7 @@ def index():
             '/image': 'GET ?filename=example.png - Afficher une image',
             '/text': 'GET ?content=Hello+World&color=255,255,255 - Défiler du texte',
             '/video': 'GET ?filename=animation.gif - Lire une vidéo',
+            '/random': 'GET ?interval=10 - Afficher aléatoirement images/vidéos avec intervalle',
             '/clear': 'GET - Effacer l\'écran',
         }
     })
@@ -345,6 +481,36 @@ def display_video():
         'status': 'success',
         'action': 'video_playback',
         'filename': filename
+    })
+
+
+@app.route('/random')
+def display_random():
+    """Affiche aléatoirement des images et vidéos avec un intervalle défini"""
+    interval_str = request.args.get('interval', '10')
+
+    try:
+        interval = float(interval_str)
+        if interval < 1:
+            return jsonify({'error': 'L\'intervalle doit être >= 1 seconde'}), 400
+    except ValueError:
+        return jsonify({'error': 'Intervalle invalide (doit être un nombre)'}), 400
+
+    # Vérifier qu'il y a des médias disponibles
+    media_files = renderer.get_all_media_files()
+    if not media_files:
+        return jsonify({
+            'error': 'Aucun média trouvé',
+            'help': 'Placez des images dans assets/images/ ou des vidéos dans assets/videos/'
+        }), 404
+
+    renderer.start_render(renderer.render_random_media, interval)
+
+    return jsonify({
+        'status': 'success',
+        'action': 'random_media',
+        'interval': interval,
+        'media_count': len(media_files)
     })
 
 
