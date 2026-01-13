@@ -17,7 +17,8 @@ from pathlib import Path
 
 import pytz
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template, send_from_directory
+from werkzeug.utils import secure_filename
 from PIL import Image, ImageDraw, ImageFont
 import imageio
 
@@ -667,6 +668,7 @@ def index():
             'panels': MATRIX_CONFIG['chain_length'],
         },
         'endpoints': {
+            '/dashboard': 'GET - Interface web de contrôle',
             '/image': 'GET ?filename=example.png - Afficher une image',
             '/text': 'GET ?content=Hello+World&color=255,255,255 - Défiler du texte',
             '/video': 'GET ?filename=animation.gif - Lire une vidéo',
@@ -674,6 +676,9 @@ def index():
             '/clock': 'GET ?format=24&seconds=true&color=255,255,255 - Afficher l\'heure',
             '/date': 'GET ?format=%d/%m/%Y&color=255,255,255 - Afficher la date',
             '/weather': 'GET - Afficher la météo (nécessite clé API)',
+            '/files': 'GET ?type=images|videos - Lister les fichiers',
+            '/files/upload': 'POST - Upload de fichiers',
+            '/files/<type>/<filename>': 'GET/DELETE - Récupérer ou supprimer un fichier',
             '/clear': 'GET - Effacer l\'écran',
         },
         'config': {
@@ -883,6 +888,163 @@ def clear_display():
         'status': 'success',
         'action': 'clear'
     })
+
+
+# ============================================================================
+# INTERFACE WEB ET GESTION DE FICHIERS
+# ============================================================================
+
+@app.route('/dashboard')
+def dashboard():
+    """Interface web de contrôle"""
+    return render_template('dashboard.html')
+
+
+@app.route('/files')
+def list_files():
+    """Liste les fichiers disponibles"""
+    file_type = request.args.get('type', 'images')
+
+    if file_type == 'images':
+        directory = IMAGES_DIR
+        extensions = CONFIG['supported_formats']['images']
+    elif file_type == 'videos':
+        directory = VIDEOS_DIR
+        extensions = CONFIG['supported_formats']['videos']
+    else:
+        return jsonify({'error': 'Type invalide'}), 400
+
+    try:
+        files = []
+        if directory.exists():
+            for file_path in directory.iterdir():
+                if file_path.is_file() and file_path.suffix.lower() in extensions:
+                    stat = file_path.stat()
+                    files.append({
+                        'name': file_path.name,
+                        'size': stat.st_size,
+                        'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                    })
+
+        # Trier par date de modification (plus récent en premier)
+        files.sort(key=lambda x: x['modified'], reverse=True)
+
+        return jsonify({
+            'type': file_type,
+            'files': files,
+            'count': len(files)
+        })
+
+    except Exception as e:
+        logger.error(f"Erreur lors du listage des fichiers: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/files/upload', methods=['POST'])
+def upload_files():
+    """Upload de fichiers (images ou vidéos)"""
+    if 'files' not in request.files:
+        return jsonify({'error': 'Aucun fichier'}), 400
+
+    files = request.files.getlist('files')
+    uploaded = []
+    errors = []
+
+    for file in files:
+        if file.filename == '':
+            continue
+
+        # Sécuriser le nom de fichier
+        filename = secure_filename(file.filename)
+        file_ext = Path(filename).suffix.lower()
+
+        # Déterminer le type et le dossier de destination
+        if file_ext in CONFIG['supported_formats']['images']:
+            destination = IMAGES_DIR
+            file_type = 'image'
+        elif file_ext in CONFIG['supported_formats']['videos']:
+            destination = VIDEOS_DIR
+            file_type = 'video'
+        else:
+            errors.append(f"{filename}: format non supporté")
+            continue
+
+        try:
+            # Créer le dossier si nécessaire
+            destination.mkdir(parents=True, exist_ok=True)
+
+            # Sauvegarder le fichier
+            file_path = destination / filename
+            file.save(str(file_path))
+
+            uploaded.append({
+                'filename': filename,
+                'type': file_type,
+                'size': file_path.stat().st_size
+            })
+
+            logger.info(f"Fichier uploadé: {filename} ({file_type})")
+
+        except Exception as e:
+            errors.append(f"{filename}: {str(e)}")
+            logger.error(f"Erreur lors de l'upload de {filename}: {e}")
+
+    return jsonify({
+        'status': 'success',
+        'uploaded': len(uploaded),
+        'files': uploaded,
+        'errors': errors
+    })
+
+
+@app.route('/files/<file_type>/<filename>', methods=['DELETE'])
+def delete_file(file_type, filename):
+    """Supprime un fichier"""
+    # Sécuriser le nom de fichier
+    filename = secure_filename(filename)
+
+    if file_type == 'images':
+        file_path = IMAGES_DIR / filename
+    elif file_type == 'videos':
+        file_path = VIDEOS_DIR / filename
+    else:
+        return jsonify({'error': 'Type invalide'}), 400
+
+    try:
+        if not file_path.exists():
+            return jsonify({'error': 'Fichier non trouvé'}), 404
+
+        file_path.unlink()
+        logger.info(f"Fichier supprimé: {filename}")
+
+        return jsonify({
+            'status': 'success',
+            'filename': filename
+        })
+
+    except Exception as e:
+        logger.error(f"Erreur lors de la suppression de {filename}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/files/<file_type>/<filename>', methods=['GET'])
+def get_file(file_type, filename):
+    """Télécharge ou prévisualise un fichier"""
+    # Sécuriser le nom de fichier
+    filename = secure_filename(filename)
+
+    if file_type == 'images':
+        directory = IMAGES_DIR
+    elif file_type == 'videos':
+        directory = VIDEOS_DIR
+    else:
+        return jsonify({'error': 'Type invalide'}), 400
+
+    try:
+        return send_from_directory(directory, filename)
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération de {filename}: {e}")
+        return jsonify({'error': 'Fichier non trouvé'}), 404
 
 
 if __name__ == '__main__':

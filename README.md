@@ -93,7 +93,29 @@ Si la librairie `rgbmatrix` n'est pas installée, le serveur démarre en **mode 
 
 ## 🌐 API HTTP
 
-### Page d'accueil
+### 🖥️ Interface Web (Dashboard)
+
+**Accéder au dashboard :**
+
+```bash
+http://<IP_RASPBERRY>:5000/dashboard
+```
+
+**Interface web complète avec :**
+- 📤 Upload de fichiers par glisser-déposer
+- 📂 Gestionnaire de fichiers (images et vidéos)
+- ⚡ Contrôles rapides (horloge, date, météo, aléatoire, effacer)
+- 📊 Statut du serveur en temps réel
+- 🗑️ Suppression de fichiers
+- ▶️ Affichage direct depuis l'interface
+
+**Capture d'écran :**
+
+Le dashboard permet de gérer tous les médias et contrôler l'affichage depuis un navigateur web, sans ligne de commande !
+
+---
+
+### Page d'accueil API
 
 ```bash
 GET http://<IP_RASPBERRY>:5000/
@@ -305,6 +327,88 @@ Arrête immédiatement tout rendu en cours et affiche un écran noir.
 ```bash
 curl "http://192.168.1.100:5000/clear"
 ```
+
+---
+
+### 📂 Gestion des fichiers (API)
+
+#### Lister les fichiers
+
+```bash
+GET http://<IP_RASPBERRY>:5000/files?type=images
+GET http://<IP_RASPBERRY>:5000/files?type=videos
+```
+
+Retourne la liste des fichiers avec leur taille et date de modification.
+
+**Exemple de réponse :**
+
+```json
+{
+  "type": "images",
+  "count": 5,
+  "files": [
+    {
+      "name": "logo.png",
+      "size": 45231,
+      "modified": "2026-01-13 10:30:00"
+    }
+  ]
+}
+```
+
+#### Upload de fichiers
+
+```bash
+POST http://<IP_RASPBERRY>:5000/files/upload
+Content-Type: multipart/form-data
+```
+
+Upload un ou plusieurs fichiers (images ou vidéos).
+
+**Exemple avec curl :**
+
+```bash
+curl -X POST -F "files=@image1.png" -F "files=@video1.gif" \
+  http://192.168.1.100:5000/files/upload
+```
+
+**Exemple avec Python :**
+
+```python
+import requests
+
+files = {
+    'files': [
+        open('image1.png', 'rb'),
+        open('video1.gif', 'rb')
+    ]
+}
+response = requests.post('http://192.168.1.100:5000/files/upload', files=files)
+print(response.json())
+```
+
+#### Supprimer un fichier
+
+```bash
+DELETE http://<IP_RASPBERRY>:5000/files/images/<filename>
+DELETE http://<IP_RASPBERRY>:5000/files/videos/<filename>
+```
+
+**Exemple :**
+
+```bash
+curl -X DELETE "http://192.168.1.100:5000/files/images/old_logo.png"
+```
+
+#### Télécharger un fichier
+
+```bash
+GET http://<IP_RASPBERRY>:5000/files/images/<filename>
+GET http://<IP_RASPBERRY>:5000/files/videos/<filename>
+```
+
+Télécharge ou prévisualise le fichier dans le navigateur.
 
 ---
 
@@ -700,9 +804,16 @@ Ce projet est open-source. Contributions bienvenues !
 - ✅ Gestion des conflits (un seul rendu actif à la fois)
 - ✅ Mode simulation (sans hardware)
 
+**Interface web et gestion de fichiers :**
+- ✅ Dashboard web complet avec interface graphique
+- ✅ Upload de fichiers par glisser-déposer
+- ✅ Gestionnaire de fichiers (images et vidéos)
+- ✅ API REST pour gestion des fichiers (liste, upload, suppression)
+- ✅ Contrôles rapides depuis le navigateur
+- ✅ Affichage direct depuis l'interface
+
 ### 🔮 Fonctionnalités futures envisagées
 
-- 🧪 Dashboard web pour contrôle visuel avec interface graphique
 - 🧱 Playlists ordonnées et scènes personnalisées
 - 🧵 Gestion avancée des animations et transitions
 - 🎨 Effets visuels (fade, transition, wipe, scroll)

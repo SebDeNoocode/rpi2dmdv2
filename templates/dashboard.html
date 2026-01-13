@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPI2DMDv2 - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            border-radius: 12px;
+            padding: 20px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .status {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 968px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            font-size: 20px;
+            margin-bottom: 16px;
+            color: #333;
+        }
+
+        .upload-area {
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 16px;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f7fafc;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #edf2f7;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-success {
+            background: #10b981;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .control-btn {
+            width: 100%;
+        }
+
+        .files-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+        }
+
+        .file-item:hover {
+            background: #f7fafc;
+            border-color: #cbd5e0;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .file-icon {
+            font-size: 24px;
+        }
+
+        .file-details {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .file-meta {
+            font-size: 12px;
+            color: #718096;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #718096;
+            transition: all 0.2s;
+            margin-bottom: -2px;
+        }
+
+        .tab-btn:hover {
+            color: #667eea;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #667eea;
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #718096;
+        }
+
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎛️ RPI2DMDv2 Dashboard</h1>
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-dot"></div>
+                    <span id="server-status">Serveur connecté</span>
+                </div>
+                <div class="status-item">
+                    📺 <span id="display-size">640 × 64 pixels</span>
+                </div>
+                <div class="status-item">
+                    📍 <span id="location">Paris</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- Contrôles -->
+            <div class="card">
+                <h2>⚡ Contrôles rapides</h2>
+                <div class="controls">
+                    <button class="btn control-btn" onclick="showClock()">
+                        🕐 Horloge
+                    </button>
+                    <button class="btn control-btn" onclick="showDate()">
+                        📅 Date
+                    </button>
+                    <button class="btn control-btn" onclick="showWeather()">
+                        🌤️ Météo
+                    </button>
+                    <button class="btn control-btn" onclick="startRandom()">
+                        🎲 Aléatoire
+                    </button>
+                    <button class="btn btn-danger control-btn" onclick="clearDisplay()">
+                        🖤 Effacer
+                    </button>
+                </div>
+            </div>
+
+            <!-- Upload -->
+            <div class="card">
+                <h2>📤 Upload de fichiers</h2>
+                <div id="alert" class="alert"></div>
+                <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">📁</div>
+                    <div>Cliquez ou glissez des fichiers ici</div>
+                    <small style="color: #718096; margin-top: 8px; display: block;">
+                        Images: PNG, JPG, GIF | Vidéos: GIF, MP4
+                    </small>
+                </div>
+                <input type="file" id="fileInput" multiple accept="image/*,video/*" onchange="uploadFiles(this.files)">
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fichiers -->
+        <div class="card">
+            <h2>📂 Mes fichiers</h2>
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="switchTab('images')">🖼️ Images</button>
+                <button class="tab-btn" onclick="switchTab('videos')">🎬 Vidéos</button>
+            </div>
+            <div class="files-list" id="filesList">
+                <div class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <div>Aucun fichier. Uploadez vos premiers médias !</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'images';
+        const API_BASE = '';
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', () => {
+            loadServerInfo();
+            loadFiles();
+            setupDragAndDrop();
+        });
+
+        // Informations serveur
+        async function loadServerInfo() {
+            try {
+                const response = await fetch('/');
+                const data = await response.json();
+                document.getElementById('display-size').textContent =
+                    `${data.display.width} × ${data.display.height} pixels`;
+                document.getElementById('location').textContent = data.config.location;
+            } catch (error) {
+                showAlert('Erreur de connexion au serveur', 'error');
+            }
+        }
+
+        // Chargement des fichiers
+        async function loadFiles() {
+            const filesList = document.getElementById('filesList');
+            filesList.innerHTML = '<div class="spinner"></div>';
+
+            try {
+                const response = await fetch(`/files?type=${currentTab}`);
+                const data = await response.json();
+
+                if (data.files.length === 0) {
+                    filesList.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">📭</div>
+                            <div>Aucun fichier dans ${currentTab}</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                filesList.innerHTML = data.files.map(file => `
+                    <div class="file-item">
+                        <div class="file-info">
+                            <div class="file-icon">${currentTab === 'images' ? '🖼️' : '🎬'}</div>
+                            <div class="file-details">
+                                <div class="file-name">${file.name}</div>
+                                <div class="file-meta">${formatFileSize(file.size)} • ${file.modified}</div>
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-success btn-small" onclick="displayFile('${file.name}', '${currentTab}')">
+                                ▶️ Afficher
+                            </button>
+                            <button class="btn btn-danger btn-small" onclick="deleteFile('${file.name}', '${currentTab}')">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                filesList.innerHTML = '<div class="empty-state">❌ Erreur de chargement</div>';
+            }
+        }
+
+        // Upload de fichiers
+        async function uploadFiles(files) {
+            if (files.length === 0) return;
+
+            const formData = new FormData();
+            Array.from(files).forEach(file => {
+                formData.append('files', file);
+            });
+
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            progressBar.style.display = 'block';
+
+            try {
+                const xhr = new XMLHttpRequest();
+
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percent = (e.loaded / e.total) * 100;
+                        progressFill.style.width = percent + '%';
+                    }
+                });
+
+                xhr.addEventListener('load', () => {
+                    if (xhr.status === 200) {
+                        const data = JSON.parse(xhr.responseText);
+                        showAlert(`✅ ${data.uploaded} fichier(s) uploadé(s)`, 'success');
+                        loadFiles();
+                        document.getElementById('fileInput').value = '';
+                    } else {
+                        showAlert('❌ Erreur lors de l\'upload', 'error');
+                    }
+                    progressBar.style.display = 'none';
+                    progressFill.style.width = '0%';
+                });
+
+                xhr.addEventListener('error', () => {
+                    showAlert('❌ Erreur de connexion', 'error');
+                    progressBar.style.display = 'none';
+                });
+
+                xhr.open('POST', '/files/upload');
+                xhr.send(formData);
+            } catch (error) {
+                showAlert('❌ Erreur lors de l\'upload', 'error');
+                progressBar.style.display = 'none';
+            }
+        }
+
+        // Suppression de fichier
+        async function deleteFile(filename, type) {
+            if (!confirm(`Supprimer ${filename} ?`)) return;
+
+            try {
+                const response = await fetch(`/files/${type}/${filename}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showAlert(`✅ ${filename} supprimé`, 'success');
+                    loadFiles();
+                } else {
+                    showAlert('❌ Erreur lors de la suppression', 'error');
+                }
+            } catch (error) {
+                showAlert('❌ Erreur de connexion', 'error');
+            }
+        }
+
+        // Affichage de fichier
+        async function displayFile(filename, type) {
+            try {
+                const endpoint = type === 'images' ? '/image' : '/video';
+                const response = await fetch(`${endpoint}?filename=${filename}`);
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    showAlert(`✅ Affichage de ${filename}`, 'success');
+                } else {
+                    showAlert('❌ Erreur d\'affichage', 'error');
+                }
+            } catch (error) {
+                showAlert('❌ Erreur de connexion', 'error');
+            }
+        }
+
+        // Contrôles rapides
+        async function showClock() {
+            const response = await fetch('/clock');
+            const data = await response.json();
+            showAlert('⏰ Horloge activée', 'success');
+        }
+
+        async function showDate() {
+            const response = await fetch('/date');
+            const data = await response.json();
+            showAlert('📅 Date affichée', 'success');
+        }
+
+        async function showWeather() {
+            const response = await fetch('/weather');
+            if (response.ok) {
+                showAlert('🌤️ Météo affichée', 'success');
+            } else {
+                showAlert('❌ Clé API météo manquante', 'error');
+            }
+        }
+
+        async function startRandom() {
+            const response = await fetch('/random?interval=10');
+            const data = await response.json();
+            if (data.status === 'success') {
+                showAlert(`🎲 Diaporama lancé (${data.media_count} médias)`, 'success');
+            } else {
+                showAlert('❌ Aucun média disponible', 'error');
+            }
+        }
+
+        async function clearDisplay() {
+            const response = await fetch('/clear');
+            showAlert('🖤 Écran effacé', 'success');
+        }
+
+        // Changement d'onglet
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            loadFiles();
+        }
+
+        // Drag & Drop
+        function setupDragAndDrop() {
+            const uploadArea = document.getElementById('uploadArea');
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => {
+                    uploadArea.classList.add('dragover');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => {
+                    uploadArea.classList.remove('dragover');
+                }, false);
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                uploadFiles(files);
+            }, false);
+        }
+
+        // Utilitaires
+        function showAlert(message, type) {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>
