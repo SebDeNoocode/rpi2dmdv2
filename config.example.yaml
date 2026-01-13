@@ -10,6 +10,10 @@ matrix:
   hardware_mapping: "regular"   # "regular" ou "adafruit-hat"
   brightness: 50                # Luminosité 0-100
   gpio_slowdown: 4              # 4 pour RPi4, 2 pour RPi3, 1 pour RPi2
+  led_rgb_sequence: "RGB"       # Ordre des couleurs LED
+                                # Options: RGB, RBG, BGR, BRG, GRB, GBR
+                                # Ajustez selon votre modèle de panneau
+                                # Si les couleurs sont inversées, essayez BGR
 
 # Chemins des médias
 paths:
@@ -67,6 +71,15 @@ server:
   host: "0.0.0.0"               # 0.0.0.0 = accessible depuis le réseau
   port: 5000                    # Port du serveur
   debug: false                  # Mode debug (mettre true pour dev)
+
+# Configuration WiFi (Raspberry Pi)
+wifi:
+  enabled: true                 # Activer la config WiFi automatique
+  ssid: "VotreSSID"             # Nom du réseau WiFi
+  password: "VotreMotDePasse"   # Mot de passe WiFi
+  country: "FR"                 # Code pays ISO (FR, US, GB, DE, etc.)
+                                # IMPORTANT: Le code pays doit correspondre
+                                # à votre localisation pour la conformité réglementaire
 
 # Extensions de fichiers supportées
 supported_formats:

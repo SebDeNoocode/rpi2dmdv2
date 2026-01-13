@@ -9,7 +9,8 @@ matrix:
   parallel: 1
   hardware_mapping: "regular"  # "regular" ou "adafruit-hat"
   brightness: 50  # 0-100
-  gpio_slowdown: 4  # Raspberry Pi 4 (ajuster selon le modèle)
+  gpio_slowdown: 4  # Raspberry Pi 4
+  led_rgb_sequence: "RGB"  # Ordre des couleurs: RGB, RBG, BGR, BRG, GRB, GBR (ajuster selon le modèle)
 
 # Chemins des médias
 paths:
@@ -67,6 +68,13 @@ server:
   host: "0.0.0.0"
   port: 5000
   debug: false
+
+# Configuration WiFi (Raspberry Pi)
+wifi:
+  enabled: true              # Activer la configuration WiFi automatique
+  ssid: "VotreSSID"          # Nom du réseau WiFi
+  password: "VotreMotDePasse" # Mot de passe WiFi
+  country: "FR"              # Code pays (FR, US, GB, etc.)
 
 # Extensions de fichiers supportées
 supported_formats:

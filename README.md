@@ -314,6 +314,8 @@ curl "http://192.168.1.100:5000/clear"
 RPI2DMDv2/
 ├── controller.py          # Script principal
 ├── config.yaml           # Configuration centralisée
+├── config.example.yaml   # Template de configuration
+├── wifi_setup.py         # Script de configuration WiFi
 ├── requirements.txt       # Dépendances Python
 ├── README.md             # Documentation
 └── assets/
@@ -341,7 +343,25 @@ matrix:
   hardware_mapping: "regular"  # "regular" ou "adafruit-hat"
   brightness: 50  # 0-100
   gpio_slowdown: 4  # Raspberry Pi 4
+  led_rgb_sequence: "RGB"  # Ordre des couleurs LED
 ```
+
+**Paramètre `led_rgb_sequence` :**
+
+Certains panneaux LED utilisent un ordre de couleurs différent. Si vos couleurs sont incorrectes (rouge affiche bleu, etc.), ajustez ce paramètre.
+
+**Options disponibles :**
+- `RGB` - Rouge, Vert, Bleu (standard)
+- `RBG` - Rouge, Bleu, Vert
+- `BGR` - Bleu, Vert, Rouge (fréquent sur certains panneaux)
+- `BRG` - Bleu, Rouge, Vert
+- `GRB` - Vert, Rouge, Bleu
+- `GBR` - Vert, Bleu, Rouge
+
+**Comment tester :**
+1. Affichez une image avec des couleurs primaires (rouge, vert, bleu)
+2. Si les couleurs ne correspondent pas, essayez `BGR` en premier
+3. Ajustez jusqu'à obtenir les bonnes couleurs
 
 #### 2. **Chemins des médias** (`paths`)
 
@@ -449,6 +469,53 @@ fonts:
 ```
 
 Personnalisez les polices et tailles pour chaque type d'affichage
+
+#### 🔟 **Configuration WiFi** (`wifi`)
+
+```yaml
+wifi:
+  enabled: true
+  ssid: "VotreSSID"
+  password: "VotreMotDePasse"
+  country: "FR"
+```
+
+**Configuration du WiFi Raspberry Pi :**
+
+Le système peut automatiquement configurer la connexion WiFi du Raspberry Pi.
+
+**Paramètres :**
+- `enabled` : activer/désactiver la configuration automatique
+- `ssid` : nom du réseau WiFi
+- `password` : mot de passe WiFi
+- `country` : code pays ISO (FR, US, GB, DE, etc.)
+
+**⚠️ Important :** Le code pays doit correspondre à votre localisation pour la conformité réglementaire RF.
+
+**Utilisation du script WiFi :**
+
+```bash
+# Éditer la configuration WiFi dans config.yaml
+nano config.yaml
+
+# Lancer le script de configuration (nécessite sudo)
+sudo python3 wifi_setup.py
+```
+
+Le script :
+1. Lit la configuration WiFi depuis `config.yaml`
+2. Génère le fichier `/etc/wpa_supplicant/wpa_supplicant.conf`
+3. Redémarre le service WiFi
+4. Vérifie la connexion
+
+**Codes pays courants :**
+- `FR` - France
+- `US` - États-Unis
+- `GB` - Royaume-Uni
+- `DE` - Allemagne
+- `ES` - Espagne
+- `IT` - Italie
+- `CA` - Canada
 
 ---
 
@@ -628,6 +695,8 @@ Ce projet est open-source. Contributions bienvenues !
 - ✅ Gestion automatique de la luminosité selon l'heure
 - ✅ Support des fuseaux horaires
 - ✅ Localisation configurable
+- ✅ Configuration WiFi automatique (`wifi_setup.py`)
+- ✅ Sélection de l'ordre des couleurs LED (RGB/BGR/etc.)
 - ✅ Gestion des conflits (un seul rendu actif à la fois)
 - ✅ Mode simulation (sans hardware)
 

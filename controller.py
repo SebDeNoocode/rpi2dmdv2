@@ -630,6 +630,11 @@ def initialize_matrix() -> Optional[RGBMatrix]:
         options.brightness = MATRIX_CONFIG['brightness']
         options.gpio_slowdown = MATRIX_CONFIG['gpio_slowdown']
 
+        # Configuration de l'ordre des couleurs LED
+        if 'led_rgb_sequence' in MATRIX_CONFIG:
+            options.led_rgb_sequence = MATRIX_CONFIG['led_rgb_sequence']
+            logger.info(f"Séquence LED configurée: {MATRIX_CONFIG['led_rgb_sequence']}")
+
         # Options additionnelles pour améliorer la qualité
         options.disable_hardware_pulsing = True
         options.drop_privileges = False  # Nécessaire pour root
