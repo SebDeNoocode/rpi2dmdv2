@@ -1,0 +1,93 @@
+# Configuration RPI2DMDv2 - Exemple
+# Copiez ce fichier en "config.yaml" et personnalisez les valeurs
+
+# Configuration de la matrice LED
+matrix:
+  rows: 64                      # Nombre de lignes par panneau
+  cols: 128                     # Nombre de colonnes par panneau
+  chain_length: 5               # Nombre de panneaux en série
+  parallel: 1                   # Nombre de chaînes parallèles
+  hardware_mapping: "regular"   # "regular" ou "adafruit-hat"
+  brightness: 50                # Luminosité 0-100
+  gpio_slowdown: 4              # 4 pour RPi4, 2 pour RPi3, 1 pour RPi2
+
+# Chemins des médias
+paths:
+  images: "assets/images"       # Dossier des images
+  videos: "assets/videos"       # Dossier des vidéos
+  fonts: "assets/fonts"         # Dossier des polices
+
+# Durées par défaut (en secondes)
+durations:
+  default_image: 10             # Durée d'affichage des images
+  default_video: 10             # Durée de lecture des vidéos
+  random_interval: 10           # Intervalle entre médias en mode aléatoire
+
+# Configuration de l'horloge et date
+clock:
+  enabled: true
+  format_24h: true              # true=24h, false=12h AM/PM
+  show_seconds: true            # Afficher les secondes
+  color: [255, 255, 255]        # Couleur RGB [R, G, B]
+  date_format: "%d/%m/%Y"       # Format Python strftime
+
+# Gestion automatique de la luminosité
+auto_brightness:
+  enabled: true                 # Activer/désactiver
+  schedule:
+    - time: "06:00"             # Lever du jour
+      brightness: 30
+    - time: "08:00"             # Matin
+      brightness: 60
+    - time: "12:00"             # Midi - luminosité maximale
+      brightness: 80
+    - time: "18:00"             # Soir
+      brightness: 60
+    - time: "22:00"             # Nuit
+      brightness: 30
+    - time: "00:00"             # Minuit - luminosité minimale
+      brightness: 15
+
+# Localisation et fuseau horaire
+location:
+  city: "Paris"                 # Votre ville
+  country: "FR"                 # Code pays ISO
+  timezone: "Europe/Paris"      # Fuseau horaire pytz
+  latitude: 48.8566             # Latitude pour météo
+  longitude: 2.3522             # Longitude pour météo
+
+# Clés API pour services externes
+api_keys:
+  # OpenWeatherMap - Gratuit sur https://openweathermap.org/api
+  # Créez un compte et collez votre clé ici
+  openweathermap: "VOTRE_CLE_API_ICI"
+
+# Configuration du serveur Flask
+server:
+  host: "0.0.0.0"               # 0.0.0.0 = accessible depuis le réseau
+  port: 5000                    # Port du serveur
+  debug: false                  # Mode debug (mettre true pour dev)
+
+# Extensions de fichiers supportées
+supported_formats:
+  images: [".png", ".jpg", ".jpeg", ".bmp", ".gif"]
+  videos: [".gif", ".mp4", ".avi", ".mov"]
+
+# Configuration des polices
+fonts:
+  # Police pour l'horloge
+  clock: "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+  clock_size: 32
+
+  # Police pour la date
+  date: "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+  date_size: 16
+
+  # Police pour le texte défilant
+  text: "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+  text_size: 16
+
+# NOTES:
+# - Redémarrez le serveur après modification de config.yaml
+# - Consultez README.md pour plus de détails
+# - Les chemins de polices doivent être absolus ou relatifs au script
