@@ -88,7 +88,7 @@ if [ ! -d "$HOME/rpi-rgb-led-matrix" ]; then
 
     # Installer les bindings Python
     cd bindings/python
-    pip3 install -e .
+    pip3 install -e . --break-system-packages
 
     log_success "rpi-rgb-led-matrix installé"
 else
@@ -103,7 +103,7 @@ cd "$SCRIPT_DIR"
 
 if [ -f "requirements.txt" ]; then
     log_info "Installation des packages Python depuis requirements.txt..."
-    if pip3 install -r requirements.txt; then
+    if pip3 install -r requirements.txt --break-system-packages; then
         log_success "Dépendances Python installées"
 
         # Vérification que les modules critiques sont bien installés
@@ -113,7 +113,7 @@ if [ -f "requirements.txt" ]; then
         else
             log_warning "Certains modules Python ne semblent pas importables"
             log_info "Tentative de réinstallation..."
-            pip3 install --upgrade --force-reinstall -r requirements.txt
+            pip3 install --upgrade --force-reinstall -r requirements.txt --break-system-packages
         fi
     else
         log_error "Échec de l'installation des dépendances Python"
