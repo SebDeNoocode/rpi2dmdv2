@@ -113,7 +113,7 @@ ssh pi@rpi2dmd.local
 sudo apt-get update
 sudo apt-get upgrade -y
 
-# Installer les outils de base
+# Installer les outils de base et dépendances de compilation
 sudo apt-get install -y \
     git \
     python3 \
@@ -123,6 +123,12 @@ sudo apt-get install -y \
     build-essential \
     libgraphicsmagick++-dev \
     libwebp-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    libtiff-dev \
+    libfreetype6-dev \
+    liblcms2-dev \
+    libopenjp2-7-dev \
     wget
 ```
 
@@ -1124,6 +1130,39 @@ python3 -c "import flask, pytz, yaml, PIL, imageio, requests; print('✅ Tous le
 ```
 
 **Cause :** Les dépendances Python n'ont pas été installées correctement, souvent à cause de l'erreur "externally-managed-environment" sur Debian 12+.
+
+---
+
+### Problème : "subprocess-exited-with-error" lors de l'installation de Pillow
+
+**Symptôme :** Erreur lors de `pip3 install` avec "Getting requirements to build wheel did not run successfully" pour Pillow :
+```
+error: subprocess-exited-with-error
+Getting requirements to build wheel did not run successfully.
+exit code: 1
+```
+
+**Solution :**
+```bash
+# Installer les bibliothèques de développement nécessaires pour compiler Pillow
+apt-get install -y \
+    libjpeg-dev \
+    zlib1g-dev \
+    libtiff-dev \
+    libfreetype6-dev \
+    liblcms2-dev \
+    libopenjp2-7-dev
+
+# Réessayer l'installation Python
+pip3 install -r requirements.txt --break-system-packages
+```
+
+**Cause :** Pillow nécessite des bibliothèques système pour traiter les images (JPEG, PNG, TIFF). Si ces bibliothèques de développement ne sont pas installées, pip ne peut pas compiler Pillow depuis les sources.
+
+**Alternative :** Utiliser le package système précompilé (déjà inclus dans install.sh) :
+```bash
+apt-get install -y python3-pillow
+```
 
 ---
 
