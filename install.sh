@@ -71,6 +71,12 @@ apt-get install -y \
     build-essential \
     libgraphicsmagick++-dev \
     libwebp-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    libtiff-dev \
+    libfreetype6-dev \
+    liblcms2-dev \
+    libopenjp2-7-dev \
     wget \
     curl
 
