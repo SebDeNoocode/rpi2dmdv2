@@ -146,7 +146,7 @@ make -C examples-api-use
 
 # Installer les bindings Python
 cd bindings/python
-sudo pip3 install -e .
+sudo pip3 install -e . --break-system-packages
 ```
 
 **Tester l'installation :**
@@ -182,11 +182,13 @@ cd rpi2dmdv2
 
 ```bash
 # Installer toutes les dépendances
-sudo pip3 install -r requirements.txt
+sudo pip3 install -r requirements.txt --break-system-packages
 
 # Vérifier l'installation
 python3 -c "import flask; import PIL; import yaml; print('✅ Dépendances OK')"
 ```
+
+> **Note pour Debian 12+ / Raspberry Pi OS Bookworm :** Le flag `--break-system-packages` est nécessaire pour contourner la protection PEP 668 des environnements Python gérés. Ceci est sûr pour ce projet qui nécessite un accès système pour contrôler les GPIO.
 
 ---
 
@@ -1066,6 +1068,31 @@ sudo python3 controller.py
 
 ---
 
+### Problème : "error: externally-managed-environment"
+
+**Symptôme :** Erreur lors de `pip3 install` sur Debian 12 (Bookworm) ou Raspberry Pi OS récent :
+```
+error: externally-managed-environment
+This environment is externally managed
+```
+
+**Solution :**
+```bash
+# Ajouter le flag --break-system-packages à toutes les commandes pip3
+sudo pip3 install -r requirements.txt --break-system-packages
+
+# Pour les bindings rgbmatrix
+cd ~/rpi-rgb-led-matrix/bindings/python
+sudo pip3 install -e . --break-system-packages
+```
+
+**Cause :** Debian 12+ utilise PEP 668 pour protéger l'environnement Python système. Pour RPI2DMDv2, c'est sûr d'utiliser `--break-system-packages` car le projet nécessite un accès système (GPIO root).
+
+**Alternative (environnement virtuel - non recommandé pour ce projet) :**
+Les environnements virtuels ne fonctionnent pas bien avec les accès GPIO root requis par ce projet.
+
+---
+
 ### Problème : "ModuleNotFoundError: No module named 'rgbmatrix'"
 
 **Symptôme :** Python ne trouve pas la librairie rgbmatrix.
@@ -1074,11 +1101,29 @@ sudo python3 controller.py
 ```bash
 # Réinstaller les bindings Python
 cd ~/rpi-rgb-led-matrix/bindings/python
-sudo pip3 install -e .
+sudo pip3 install -e . --break-system-packages
 
 # Vérifier l'installation
 python3 -c "import rgbmatrix; print('✅ OK')"
 ```
+
+---
+
+### Problème : "ModuleNotFoundError: No module named 'pytz'" (ou flask, PIL, etc.)
+
+**Symptôme :** Python ne trouve pas un module Python (pytz, flask, PIL, imageio, yaml, requests).
+
+**Solution :**
+```bash
+# Réinstaller toutes les dépendances
+cd ~/rpi2dmdv2
+sudo pip3 install -r requirements.txt --break-system-packages
+
+# Vérifier l'installation
+python3 -c "import flask, pytz, yaml, PIL, imageio, requests; print('✅ Tous les modules OK')"
+```
+
+**Cause :** Les dépendances Python n'ont pas été installées correctement, souvent à cause de l'erreur "externally-managed-environment" sur Debian 12+.
 
 ---
 
