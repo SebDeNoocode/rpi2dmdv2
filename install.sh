@@ -102,8 +102,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 if [ -f "requirements.txt" ]; then
-    pip3 install -r requirements.txt
-    log_success "Dépendances Python installées"
+    log_info "Installation des packages Python depuis requirements.txt..."
+    if pip3 install -r requirements.txt; then
+        log_success "Dépendances Python installées"
+
+        # Vérification que les modules critiques sont bien installés
+        python3 -c "import flask, pytz, yaml, PIL, imageio, requests" 2>/dev/null
+        if [ $? -eq 0 ]; then
+            log_success "Tous les modules Python sont fonctionnels"
+        else
+            log_warning "Certains modules Python ne semblent pas importables"
+            log_info "Tentative de réinstallation..."
+            pip3 install --upgrade --force-reinstall -r requirements.txt
+        fi
+    else
+        log_error "Échec de l'installation des dépendances Python"
+        exit 1
+    fi
 else
     log_error "Fichier requirements.txt non trouvé"
     exit 1
